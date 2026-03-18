@@ -738,6 +738,14 @@
     const bet = parseFloat(document.getElementById('mines-bet').value);
     const payout = bet * minesMultiplier;
     updateBalance(payout);
+    // Reveal all hidden mines
+    minePositions.forEach(mp => {
+      const c = document.querySelector(`.mine-cell[data-index="${mp}"]`);
+      if (c && !c.classList.contains('revealed')) {
+        c.classList.add('revealed', 'bomb');
+        c.textContent = '💣';
+      }
+    });
     const res = document.getElementById('mines-result');
     res.className = 'result-msg win';
     res.textContent = `✅ Wypłacono ${fmt(payout)} PLN (×${minesMultiplier.toFixed(2)})`;
