@@ -180,6 +180,29 @@
   .history-chip.win  { background:rgba(0,255,136,.1);  border:1px solid rgba(0,255,136,.3); color:var(--green); }
   .history-chip.lose { background:rgba(255,60,95,.1);  border:1px solid rgba(255,60,95,.3);  color:var(--red); }
 </style>
+<script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-analytics.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+  const firebaseConfig = {
+    apiKey: "AIzaSyABZ_VX9pmz80_OMuA-8f8eWw9n7X08l_Q",
+    authDomain: "neonbet-8388b.firebaseapp.com",
+    projectId: "neonbet-8388b",
+    storageBucket: "neonbet-8388b.firebasestorage.app",
+    messagingSenderId: "137314023473",
+    appId: "1:137314023473:web:09254bf36b081f64d9bd10",
+    measurementId: "G-QM779J6XS2"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
+</script>
 </head>
 <body>
 
