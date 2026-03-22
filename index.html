@@ -3,8 +3,39 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NeonBet — Hazard Online</title>
+<title>NeonBet — Casino Online</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<!-- Firebase SDKs -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  // ── PASTE YOUR FIREBASE CONFIG HERE ──────────────────────────────────────
+  // Go to https://console.firebase.google.com → your project →
+  // Project settings → Your apps → Web app → firebaseConfig
+  const firebaseConfig = {
+    apiKey:            "AIzaSyABZ_VX9pmz80_OMuA-8f8eWw9n7X08l_Q",
+    authDomain:        "neonbet-8388b.firebaseapp.com",
+    projectId:         "neonbet-8388b",
+    storageBucket:     "neonbet-8388b.firebasestorage.app",
+    messagingSenderId: "137314023473",
+    appId:             "1:137314023473:web:b2ce2909b2ceca09d9bd10"
+  };
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const app  = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db   = getFirestore(app);
+  const provider = new GoogleAuthProvider();
+
+  // Expose to global scope so non-module code can call them
+  window._fb = { auth, db, provider, signInWithPopup, signOut,
+                 onAuthStateChanged, doc, getDoc, setDoc, updateDoc, serverTimestamp };
+</script>
 <style>
   :root {
     --bg: #080c10; --surface: #0d1318; --card: #111820; --border: #1e2d3d;
@@ -22,10 +53,10 @@
     background-size: 40px 40px; pointer-events: none; z-index: 0;
   }
   header {
-    position: relative; z-index: 10;
+    position: sticky; top: 0; z-index: 10;
     display: flex; align-items: center; justify-content: space-between;
     padding: 14px 16px; border-bottom: 1px solid var(--border);
-    background: rgba(8,12,16,0.95); backdrop-filter: blur(10px);
+    background: rgba(8,12,16,0.97); backdrop-filter: blur(10px);
   }
   .logo { font-family:'Bebas Neue',sans-serif; font-size:1.7rem; letter-spacing:3px; color:var(--green); text-shadow:0 0 20px rgba(0,255,136,.6),0 0 60px rgba(0,255,136,.2); }
   .logo span { color:var(--gold); }
@@ -207,7 +238,23 @@
   .lang-btn:hover { border-color:var(--green); color:var(--green); }
   .lang-btn .active-lang { color:var(--green); }
 
-  /* History */
+  /* AUTH */
+  .auth-btn { display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:7px 13px; font-family:'Space Mono',monospace; font-size:.7rem; font-weight:700; color:var(--text); cursor:pointer; transition:all .2s; letter-spacing:.5px; white-space:nowrap; }
+  .auth-btn:hover { border-color:var(--green); color:var(--green); }
+  .auth-btn img { width:18px; height:18px; border-radius:50%; }
+  .auth-btn .g-icon { font-size:1rem; }
+  .auth-status { display:flex; align-items:center; gap:8px; }
+  .user-name { font-size:.65rem; color:var(--muted); max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .signout-btn { background:none; border:1px solid var(--border); border-radius:4px; padding:4px 8px; font-family:'Space Mono',monospace; font-size:.6rem; color:var(--muted); cursor:pointer; transition:all .15s; }
+  .signout-btn:hover { border-color:var(--red); color:var(--red); }
+  #auth-loading { font-size:.65rem; color:var(--muted); letter-spacing:1px; }
+
+  /* SAVE INDICATOR */
+  .save-dot { width:6px; height:6px; border-radius:50%; background:var(--muted); display:inline-block; margin-left:6px; transition:background .3s; }
+  .save-dot.saving { background:var(--gold); animation:pulse .6s infinite; }
+  .save-dot.saved  { background:var(--green); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
   .history-section { margin-top:36px; }
   .history-list { display:flex; gap:7px; flex-wrap:wrap; }
   .history-chip { padding:5px 12px; border-radius:20px; font-size:.65rem; letter-spacing:1px; font-weight:700; }
@@ -219,12 +266,26 @@
 
 <header>
   <div class="logo">Neon<span>Bet</span></div>
-  <div style="display:flex;align-items:center;gap:10px">
-    <button class="lang-btn" id="lang-btn" onclick="toggleLang()"><span id="lang-label"><span class="active-lang">PL</span> / EN</span></button>
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end">
+
+    <!-- Auth area -->
+    <div id="auth-loading" style="font-size:.65rem;color:var(--muted)">...</div>
+    <div id="auth-signed-out" style="display:none">
+      <button class="auth-btn" onclick="fbSignIn()">
+        <span class="g-icon">🔑</span> Sign in with Google
+      </button>
+    </div>
+    <div id="auth-signed-in" style="display:none" class="auth-status">
+      <img id="user-avatar" src="" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--border)" alt="">
+      <span class="user-name" id="user-name"></span>
+      <button class="signout-btn" onclick="fbSignOut()">Sign out</button>
+    </div>
+
+    <button class="lang-btn" id="lang-btn" onclick="toggleLang()"><span id="lang-label">PL / <span class="active-lang">EN</span></span></button>
     <div class="balance-bar">
       <div>
-        <div class="balance-label" data-i18n="balance">Saldo</div>
-        <div class="balance-amount" id="balance">1 000,00 PLN</div>
+        <div class="balance-label" data-i18n="balance">Balance</div>
+        <div class="balance-amount" id="balance">1 000,00 PLN<span class="save-dot" id="save-dot"></span></div>
       </div>
     </div>
   </div>
@@ -405,9 +466,283 @@
 <script>
 let balance = 1000;
 const histArr = [];
+let currentUser = null;
+let saveTimeout = null;
+
+/* ——— FIREBASE AUTH & FIRESTORE ——— */
+function setSaveDot(state){ // 'saving' | 'saved' | ''
+  const d=document.getElementById('save-dot');
+  if(!d)return;
+  d.className='save-dot'+(state?' '+state:'');
+}
+
+async function loadUserData(uid){
+  const {db,doc,getDoc}=window._fb;
+  const ref=doc(db,'users',uid);
+  const snap=await getDoc(ref);
+  if(snap.exists()){
+    const data=snap.data();
+    balance=data.balance??1000;
+    // Restore history chips
+    if(Array.isArray(data.history)){
+      histArr.length=0;
+      data.history.forEach(h=>histArr.push(h));
+      const list=document.getElementById('history-list');
+      list.innerHTML='';
+      histArr.forEach(h=>{
+        const chip=document.createElement('div');
+        chip.className='history-chip '+(h.win?'win':'lose');
+        chip.textContent=(h.win?'+':'-')+fmt(Math.abs(h.amount))+' ('+h.game+')';
+        list.appendChild(chip);
+      });
+      if(histArr.length>0) list.querySelector('span')?.remove();
+    }
+  } else {
+    // New user — create doc with starting balance
+    balance=1000;
+    await saveUserData(uid);
+  }
+  document.getElementById('balance').innerHTML=fmt(balance)+' PLN<span class="save-dot saved" id="save-dot"></span>';
+}
+
+async function saveUserData(uid){
+  if(!uid)return;
+  setSaveDot('saving');
+  const {db,doc,setDoc,serverTimestamp}=window._fb;
+  try{
+    await setDoc(doc(db,'users',uid),{
+      balance, history:histArr.slice(0,50),
+      updatedAt:serverTimestamp()
+    },{merge:true});
+    setSaveDot('saved');
+    setTimeout(()=>setSaveDot(''),2000);
+  }catch(e){
+    setSaveDot('');
+    console.warn('Save failed:',e);
+  }
+}
+
+function scheduleSave(){
+  if(!currentUser)return;
+  if(saveTimeout) clearTimeout(saveTimeout);
+  setSaveDot('saving');
+  saveTimeout=setTimeout(()=>saveUserData(currentUser.uid), 1200);
+}
+
+function fbSignIn(){
+  const {auth,provider,signInWithPopup}=window._fb;
+  signInWithPopup(auth,provider).catch(e=>console.error(e));
+}
+function fbSignOut(){
+  const {auth,signOut}=window._fb;
+  signOut(auth);
+}
+
+// Wait for Firebase module to be ready, then start auth listener
+function initFirebase(){
+  if(!window._fb){ setTimeout(initFirebase,100); return; }
+  const {auth,onAuthStateChanged}=window._fb;
+  document.getElementById('auth-loading').style.display='none';
+
+  onAuthStateChanged(auth, async user=>{
+    currentUser=user;
+    if(user){
+      document.getElementById('auth-signed-in').style.display='flex';
+      document.getElementById('auth-signed-out').style.display='none';
+      document.getElementById('user-name').textContent=user.displayName||user.email;
+      const av=document.getElementById('user-avatar');
+      if(user.photoURL) av.src=user.photoURL;
+      else av.style.display='none';
+      await loadUserData(user.uid);
+    } else {
+      document.getElementById('auth-signed-in').style.display='none';
+      document.getElementById('auth-signed-out').style.display='flex';
+      // Reset to guest state
+      balance=1000;
+      histArr.length=0;
+      document.getElementById('balance').innerHTML=fmt(balance)+' PLN<span class="save-dot" id="save-dot"></span>';
+      document.getElementById('history-list').innerHTML='<span style="color:var(--muted);font-size:.75rem" data-i18n="no_history">No history — play your first round!</span>';
+    }
+  });
+}
+setTimeout(initFirebase, 0);
+
+
+/* ——— SOUND ENGINE (Web Audio API — no files needed) ——— */
+let audioCtx = null;
+function getAudio(){
+  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playTone(freq, type, vol, dur, delay=0){
+  try {
+    const ctx=getAudio();
+    const osc=ctx.createOscillator();
+    const gain=ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type=type; osc.frequency.value=freq;
+    const t=ctx.currentTime+delay;
+    gain.gain.setValueAtTime(0,t);
+    gain.gain.linearRampToValueAtTime(vol,t+0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    osc.start(t); osc.stop(t+dur+0.05);
+  } catch(e){}
+}
+
+function playNoise(vol, dur, delay=0){
+  try {
+    const ctx=getAudio();
+    const buf=ctx.createBuffer(1,ctx.sampleRate*dur,ctx.sampleRate);
+    const data=buf.getChannelData(0);
+    for(let i=0;i<data.length;i++) data[i]=(Math.random()*2-1);
+    const src=ctx.createBufferSource();
+    src.buffer=buf;
+    const gain=ctx.createGain();
+    const filter=ctx.createBiquadFilter();
+    filter.type='bandpass'; filter.frequency.value=1200; filter.Q.value=0.8;
+    src.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
+    const t=ctx.currentTime+delay;
+    gain.gain.setValueAtTime(vol,t);
+    gain.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    src.start(t); src.stop(t+dur+0.05);
+  } catch(e){}
+}
+
+// Mines: gem reveal — bright ping
+function sndGem(){
+  playTone(880,'sine',0.3,0.15);
+  playTone(1320,'sine',0.15,0.1,0.05);
+}
+// Mines: bomb explosion
+function sndBomb(){
+  playNoise(0.6,0.08);
+  playTone(80,'sawtooth',0.4,0.3,0.05);
+  playTone(60,'square',0.3,0.4,0.1);
+}
+// Mines: cashout
+function sndCashout(){
+  [0,0.07,0.14,0.21].forEach((d,i)=>playTone(440+i*110,'sine',0.2,0.12,d));
+}
+
+// Coinflip: flipping whoosh
+function sndCoinFlip(){
+  playTone(300,'sine',0.15,0.08);
+  for(let i=0;i<8;i++) playTone(200+Math.random()*400,'triangle',0.08,0.06,i*0.12);
+}
+// Coinflip: win
+function sndCoinWin(){
+  [523,659,784,1047].forEach((f,i)=>playTone(f,'sine',0.25,0.15,i*0.1));
+}
+// Coinflip: lose
+function sndCoinLose(){
+  playTone(220,'sawtooth',0.2,0.3);
+  playTone(180,'sawtooth',0.15,0.25,0.15);
+}
+
+// Case: CS2-style sharp click tick
+let caseTickInterval=null;
+function sndCaseTick(){
+  try {
+    const ctx=getAudio();
+    const now=ctx.currentTime;
+
+    // Sharp transient — very short noise burst with high-pass = "click"
+    const bufLen=Math.floor(ctx.sampleRate*0.018);
+    const buf=ctx.createBuffer(1,bufLen,ctx.sampleRate);
+    const data=buf.getChannelData(0);
+    for(let i=0;i<bufLen;i++) data[i]=(Math.random()*2-1)*Math.pow(1-i/bufLen,3);
+
+    const src=ctx.createBufferSource();
+    src.buffer=buf;
+
+    // High-pass to make it sharp and clicky, not bassy
+    const hp=ctx.createBiquadFilter();
+    hp.type='highpass';
+    hp.frequency.value=2200;
+
+    // Slight pitch randomization like CS2
+    const pitch=0.92+Math.random()*0.16;
+    src.playbackRate.value=pitch;
+
+    const gain=ctx.createGain();
+    gain.gain.setValueAtTime(0.55,now);
+    gain.gain.exponentialRampToValueAtTime(0.001,now+0.018);
+
+    src.connect(hp); hp.connect(gain); gain.connect(ctx.destination);
+    src.start(now); src.stop(now+0.025);
+
+    // Tiny tonal component — gives the metallic "tink"
+    const osc=ctx.createOscillator();
+    const og=ctx.createGain();
+    osc.type='triangle';
+    osc.frequency.value=3800+Math.random()*600;
+    og.gain.setValueAtTime(0.07,now);
+    og.gain.exponentialRampToValueAtTime(0.001,now+0.014);
+    osc.connect(og); og.connect(ctx.destination);
+    osc.start(now); osc.stop(now+0.02);
+  } catch(e){}
+}
+function startCaseTicks(startDelay=0){
+  stopCaseTicks();
+  let interval=35;
+  const maxInterval=280;
+  function tick(){
+    sndCaseTick();
+    interval=Math.min(interval*1.042, maxInterval);
+    caseTickInterval=setTimeout(tick, interval);
+  }
+  caseTickInterval=setTimeout(tick, startDelay);
+}
+function stopCaseTicks(){
+  if(caseTickInterval){ clearTimeout(caseTickInterval); caseTickInterval=null; }
+}
+// Case: rare item reveal
+function sndCaseReveal(rarity){
+  const freqs={mil:[440,550],ind:[500,650],res:[560,720,900],cla:[600,800,1000,1200],sec:[700,900,1100,1400,1800],cov:[800,1000,1300,1700,2100,2600]};
+  const f=freqs[rarity]||freqs.mil;
+  f.forEach((freq,i)=>playTone(freq,'sine',0.3,0.2,i*0.08));
+  if(rarity==='cov'||rarity==='sec'){
+    setTimeout(()=>{ [523,659,784].forEach((f,i)=>playTone(f,'sine',0.2,0.3,i*0.12)); },600);
+  }
+}
+
+// Roulette: ball clicking on wheel
+let rouletteBallInterval=null;
+function startRouletteBall(){
+  stopRouletteBall();
+  let interval=60;
+  const maxInterval=400;
+  let elapsed=0;
+  function tick(){
+    playNoise(0.12,0.02);
+    playTone(2400+Math.random()*400,'square',0.05,0.015,0.005);
+    interval=Math.min(interval*1.045, maxInterval);
+    elapsed+=interval;
+    if(elapsed<4500) rouletteBallInterval=setTimeout(tick,interval);
+  }
+  rouletteBallInterval=setTimeout(tick,0);
+}
+function stopRouletteBall(){
+  if(rouletteBallInterval){ clearTimeout(rouletteBallInterval); rouletteBallInterval=null; }
+}
+// Roulette: win
+function sndRouletteWin(isGreen){
+  if(isGreen){
+    [523,659,784,1047,1319].forEach((f,i)=>playTone(f,'sine',0.3,0.2,i*0.09));
+  } else {
+    [440,554,659].forEach((f,i)=>playTone(f,'sine',0.25,0.2,i*0.1));
+  }
+}
+// Roulette: lose
+function sndRouletteLose(){
+  playTone(200,'sawtooth',0.2,0.35);
+  playTone(160,'sawtooth',0.15,0.3,0.2);
+}
+
 
 /* ——— i18n ——— */
-let currentLang = 'pl';
+let currentLang = 'en';
 const T = {
   pl: {
     balance:'Saldo', choose_game:'Wybierz grę', bet:'Zakład',
@@ -455,8 +790,12 @@ const T = {
 function t(key){ return T[currentLang][key] || key; }
 
 
-function fmt(n){ return n.toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-function updateBalance(d){ balance = Math.max(0, balance+d); document.getElementById('balance').textContent = fmt(balance)+' PLN'; }
+function fmt(n){ return n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function updateBalance(d){
+  balance = Math.max(0, balance+d);
+  document.getElementById('balance').innerHTML=fmt(balance)+' PLN<span class="save-dot" id="save-dot"></span>';
+  scheduleSave();
+}
 function setBet(id,m){ const i=document.getElementById(id); i.value=Math.max(1,Math.round(parseFloat(i.value)*m)); if(id==='coin-bet')updateCoinPayout(); }
 function setMax(id){ document.getElementById(id).value=balance; if(id==='coin-bet')updateCoinPayout(); }
 function addHistory(game,win,amount){
@@ -468,6 +807,7 @@ function addHistory(game,win,amount){
   chip.textContent=(win?'+':'-')+fmt(Math.abs(amount))+' ('+game+')';
   list.prepend(chip);
   if(histArr.length>20) list.lastChild?.remove();
+  scheduleSave();
 }
 
 /* MINES */
@@ -501,6 +841,7 @@ function revealCell(index){
   const mc=parseInt(document.getElementById('mines-count').value);
   if(minePos.includes(index)){
     cell.classList.add('bomb');cell.textContent='💣';minesActive=false;
+    sndBomb();
     minePos.forEach(mp=>{const c=document.querySelector(`.mine-cell[data-index="${mp}"]`);if(c&&!c.classList.contains('revealed')){c.classList.add('revealed','bomb');c.textContent='💣';}});
     const res=document.getElementById('mines-result');res.className='result-msg lose';res.textContent=`${t('boom')} ${fmt(bet)} PLN`;
     document.getElementById('btn-mines-cashout').style.display='none';
@@ -509,6 +850,7 @@ function revealCell(index){
     addHistory('Mines',false,bet);
   } else {
     cell.classList.add('gem');cell.textContent='💎';revCount++;
+    sndGem();
     minesMult=getMult(revCount,mc);
     const payout=bet*minesMult;
     document.getElementById('mines-found').textContent=revCount;
@@ -524,6 +866,7 @@ function cashoutMines(){
   const bet=parseFloat(document.getElementById('mines-bet').value);
   const payout=bet*minesMult;
   updateBalance(payout);
+  sndCashout();
   minePos.forEach(mp=>{const c=document.querySelector(`.mine-cell[data-index="${mp}"]`);if(c&&!c.classList.contains('revealed')){c.classList.add('revealed','bomb');c.textContent='💣';}});
   const res=document.getElementById('mines-result');res.className='result-msg win';res.textContent=`${t('paid')} ${fmt(payout)} PLN (×${minesMult.toFixed(2)})`;
   document.getElementById('btn-mines-cashout').style.display='none';
@@ -551,6 +894,7 @@ function flipCoin(){
   document.getElementById('coin-result').className='result-msg';
   const coin=document.getElementById('coin-visual');
   coin.className='coin-visual flipping';coin.textContent='🪙';
+  sndCoinFlip();
   const result=Math.random()<.5?'heads':'tails';
   setTimeout(()=>{
     coin.classList.remove('flipping');
@@ -558,8 +902,8 @@ function flipCoin(){
     coin.textContent=result==='heads'?'🦅':'🌐';
     coin.classList.add(won?'won':'lost');
     const res=document.getElementById('coin-result');
-    if(won){updateBalance(bet*2);res.className='result-msg win';res.textContent=`${t('won_coin')} +${fmt(bet)} PLN`;addHistory('Coinflip',true,bet);}
-    else{res.className='result-msg lose';res.textContent=`${t('lost_coin')} -${fmt(bet)} PLN`;addHistory('Coinflip',false,bet);}
+    if(won){updateBalance(bet*2);res.className='result-msg win';res.textContent=`${t('won_coin')} +${fmt(bet)} PLN`;addHistory('Coinflip',true,bet);sndCoinWin();}
+    else{res.className='result-msg lose';res.textContent=`${t('lost_coin')} -${fmt(bet)} PLN`;addHistory('Coinflip',false,bet);sndCoinLose();}
     coinFlipping=false;document.getElementById('btn-coin').disabled=false;
     setTimeout(()=>{coin.classList.remove('won','lost');coin.textContent='🪙';},2000);
   },1200);
@@ -568,40 +912,88 @@ function flipCoin(){
 /* CASE OPENING */
 const CASES=[
   { id:'gamma', emoji:'🟢', name:'Gamma Case', price:50, items:[
-    {emoji:'🔫',name:'AK-47 | Neon Revolution',   rarity:'cov',rarityName:'Covert',    weight:1, value:800},
-    {emoji:'🔪',name:'Karambit | Doppler',         rarity:'sec',rarityName:'Secret',    weight:2, value:450},
-    {emoji:'🔫',name:'M4A1-S | Cyrex',             rarity:'cla',rarityName:'Classified',weight:8, value:120},
-    {emoji:'🔫',name:'AWP | Worm God',             rarity:'cla',rarityName:'Classified',weight:8, value:90},
-    {emoji:'🔫',name:'USP-S | Road Rash',          rarity:'res',rarityName:'Restricted',weight:20,value:30},
-    {emoji:'🔫',name:'P90 | Shallow Grave',        rarity:'res',rarityName:'Restricted',weight:20,value:22},
-    {emoji:'🔫',name:'Nova | Tempest',             rarity:'ind',rarityName:'Industrial',weight:36,value:8},
-    {emoji:'🔫',name:'P2000 | Handgun',            rarity:'mil',rarityName:'Mil-Spec',  weight:40,value:3},
-    {emoji:'🔫',name:"Tec-9 | Avalanche",          rarity:'mil',rarityName:'Mil-Spec',  weight:40,value:2},
-    {emoji:'🔫',name:'SSG 08 | Dragonfire',        rarity:'mil',rarityName:'Mil-Spec',  weight:40,value:2},
+    {emoji:'🔫',name:'AK-47 | Neon Revolution',    rarity:'cov',rarityName:'Covert',    weight:1,  value:2500},
+    {emoji:'🔪',name:'Karambit | Doppler',          rarity:'sec',rarityName:'Secret',    weight:2,  value:1200},
+    {emoji:'🔫',name:'M4A1-S | Cyrex',              rarity:'cla',rarityName:'Classified',weight:8,  value:400},
+    {emoji:'🔫',name:'AWP | Worm God',              rarity:'cla',rarityName:'Classified',weight:8,  value:280},
+    {emoji:'🔫',name:'USP-S | Road Rash',           rarity:'res',rarityName:'Restricted',weight:20, value:120},
+    {emoji:'🔫',name:'P90 | Shallow Grave',         rarity:'res',rarityName:'Restricted',weight:20, value:85},
+    {emoji:'🔫',name:'Nova | Tempest',              rarity:'ind',rarityName:'Industrial',weight:36, value:50},
+    {emoji:'🔫',name:'P2000 | Handgun',             rarity:'mil',rarityName:'Mil-Spec',  weight:40, value:25},
+    {emoji:'🔫',name:'Tec-9 | Avalanche',           rarity:'mil',rarityName:'Mil-Spec',  weight:40, value:20},
+    {emoji:'🔫',name:'SSG 08 | Dragonfire',         rarity:'mil',rarityName:'Mil-Spec',  weight:40, value:20},
+  ]},
+  { id:'phoenix', emoji:'🔥', name:'Phoenix Case', price:50, items:[
+    {emoji:'🔫',name:'M4A4 | Asiimov',              rarity:'cov',rarityName:'Covert',    weight:1,  value:2800},
+    {emoji:'🔪',name:'Flip Knife | Crimson Web',    rarity:'sec',rarityName:'Secret',    weight:2,  value:1100},
+    {emoji:'🔫',name:'AK-47 | Redline',             rarity:'cla',rarityName:'Classified',weight:8,  value:380},
+    {emoji:'🔫',name:'MP9 | Hot Rod',               rarity:'cla',rarityName:'Classified',weight:8,  value:260},
+    {emoji:'🔫',name:'Glock-18 | Water Elemental',  rarity:'res',rarityName:'Restricted',weight:20, value:115},
+    {emoji:'🔫',name:'M249 | System Lock',          rarity:'res',rarityName:'Restricted',weight:20, value:80},
+    {emoji:'🔫',name:'MP7 | Skulls',                rarity:'ind',rarityName:'Industrial',weight:36, value:48},
+    {emoji:'🔫',name:'P250 | Wingshot',             rarity:'mil',rarityName:'Mil-Spec',  weight:40, value:24},
+    {emoji:'🔫',name:'Five-SeveN | Kami',           rarity:'mil',rarityName:'Mil-Spec',  weight:40, value:20},
+    {emoji:'🔫',name:'MAC-10 | Candy Apple',        rarity:'mil',rarityName:'Mil-Spec',  weight:40, value:20},
   ]},
   { id:'fracture', emoji:'🔴', name:'Fracture Case', price:80, items:[
-    {emoji:'🔫',name:'AK-47 | Legion of Anubis',   rarity:'cov',rarityName:'Covert',    weight:1, value:1200},
-    {emoji:'🔪',name:'Butterfly Knife | Tiger Tooth',rarity:'sec',rarityName:'Secret',  weight:2, value:700},
-    {emoji:'🔫',name:'Desert Eagle | Printstream', rarity:'cla',rarityName:'Classified',weight:8, value:200},
-    {emoji:'🔫',name:'MP5-SD | Oxide Oasis',       rarity:'cla',rarityName:'Classified',weight:8, value:80},
-    {emoji:'🔫',name:'P250 | Visions',             rarity:'res',rarityName:'Restricted',weight:20,value:25},
-    {emoji:'🔫',name:'Galil AR | Connexion',       rarity:'res',rarityName:'Restricted',weight:20,value:18},
-    {emoji:'🔫',name:'MAG-7 | Monster Call',       rarity:'ind',rarityName:'Industrial',weight:36,value:7},
-    {emoji:'🔫',name:'G3SG1 | Hatched Hydra',      rarity:'mil',rarityName:'Mil-Spec',  weight:40,value:3},
-    {emoji:'🔫',name:'FAMAS | Scythe',             rarity:'mil',rarityName:'Mil-Spec',  weight:40,value:2},
-    {emoji:'🔫',name:'UMP-45 | Moonrise',          rarity:'mil',rarityName:'Mil-Spec',  weight:40,value:2},
+    {emoji:'🔫',name:'AK-47 | Legion of Anubis',    rarity:'cov',rarityName:'Covert',    weight:1,  value:4000},
+    {emoji:'🔪',name:'Butterfly Knife | Tiger Tooth',rarity:'sec',rarityName:'Secret',   weight:2,  value:2000},
+    {emoji:'🔫',name:'Desert Eagle | Printstream',  rarity:'cla',rarityName:'Classified',weight:8,  value:650},
+    {emoji:'🔫',name:'MP5-SD | Oxide Oasis',        rarity:'cla',rarityName:'Classified',weight:8,  value:450},
+    {emoji:'🔫',name:'P250 | Visions',              rarity:'res',rarityName:'Restricted',weight:20, value:190},
+    {emoji:'🔫',name:'Galil AR | Connexion',        rarity:'res',rarityName:'Restricted',weight:20, value:140},
+    {emoji:'🔫',name:'MAG-7 | Monster Call',        rarity:'ind',rarityName:'Industrial',weight:36, value:80},
+    {emoji:'🔫',name:'G3SG1 | Hatched Hydra',       rarity:'mil',rarityName:'Mil-Spec',  weight:40, value:45},
+    {emoji:'🔫',name:'FAMAS | Scythe',              rarity:'mil',rarityName:'Mil-Spec',  weight:40, value:40},
+    {emoji:'🔫',name:'UMP-45 | Moonrise',           rarity:'mil',rarityName:'Mil-Spec',  weight:40, value:40},
+  ]},
+  { id:'clutch', emoji:'🔵', name:'Clutch Case', price:80, items:[
+    {emoji:'🔫',name:'AWP | Hyper Beast',           rarity:'cov',rarityName:'Covert',    weight:1,  value:4500},
+    {emoji:'🔪',name:'Talon Knife | Marble Fade',   rarity:'sec',rarityName:'Secret',    weight:2,  value:2200},
+    {emoji:'🔫',name:'M4A1-S | Decimator',          rarity:'cla',rarityName:'Classified',weight:8,  value:700},
+    {emoji:'🔫',name:'USP-S | Cortex',              rarity:'cla',rarityName:'Classified',weight:8,  value:480},
+    {emoji:'🔫',name:'AUG | Amber Slipstream',      rarity:'res',rarityName:'Restricted',weight:20, value:200},
+    {emoji:'🔫',name:'MP9 | Bulletink',             rarity:'res',rarityName:'Restricted',weight:20, value:145},
+    {emoji:'🔫',name:'P90 | Traction',              rarity:'ind',rarityName:'Industrial',weight:36, value:82},
+    {emoji:'🔫',name:'CZ75-Auto | Polymer',         rarity:'mil',rarityName:'Mil-Spec',  weight:40, value:46},
+    {emoji:'🔫',name:'Tec-9 | Snek-9',             rarity:'mil',rarityName:'Mil-Spec',  weight:40, value:42},
+    {emoji:'🔫',name:'MP7 | Powercore',             rarity:'mil',rarityName:'Mil-Spec',  weight:40, value:40},
   ]},
   { id:'dreams', emoji:'🟣', name:'Dreams & Nightmares', price:120, items:[
-    {emoji:'🔫',name:'MAC-10 | Nightmare',         rarity:'cov',rarityName:'Covert',    weight:1, value:1800},
-    {emoji:'🔪',name:'M9 Bayonet | Fade',          rarity:'sec',rarityName:'Secret',    weight:2, value:900},
-    {emoji:'🔫',name:'MP9 | Starlight Protector',  rarity:'cla',rarityName:'Classified',weight:8, value:160},
-    {emoji:'🔫',name:'Dual Berettas | Melondrama', rarity:'cla',rarityName:'Classified',weight:8, value:110},
-    {emoji:'🔫',name:'Five-SeveN | Scrawl',        rarity:'res',rarityName:'Restricted',weight:20,value:35},
-    {emoji:'🔫',name:'P90 | Neoqueen',             rarity:'res',rarityName:'Restricted',weight:20,value:28},
-    {emoji:'🔫',name:'FAMAS | Rapid Eye Movement', rarity:'ind',rarityName:'Industrial',weight:36,value:10},
-    {emoji:'🔫',name:'XM1014 | Zombie Offensive',  rarity:'mil',rarityName:'Mil-Spec',  weight:40,value:4},
-    {emoji:'🔫',name:'AUG | Midnight Lily',        rarity:'mil',rarityName:'Mil-Spec',  weight:40,value:3},
-    {emoji:'🔫',name:'PP-Bizon | Space Cat',       rarity:'mil',rarityName:'Mil-Spec',  weight:40,value:2},
+    {emoji:'🔫',name:'MAC-10 | Nightmare',          rarity:'cov',rarityName:'Covert',    weight:1,  value:6000},
+    {emoji:'🔪',name:'M9 Bayonet | Fade',           rarity:'sec',rarityName:'Secret',    weight:2,  value:3000},
+    {emoji:'🔫',name:'MP9 | Starlight Protector',   rarity:'cla',rarityName:'Classified',weight:8,  value:950},
+    {emoji:'🔫',name:'Dual Berettas | Melondrama',  rarity:'cla',rarityName:'Classified',weight:8,  value:700},
+    {emoji:'🔫',name:'Five-SeveN | Scrawl',         rarity:'res',rarityName:'Restricted',weight:20, value:280},
+    {emoji:'🔫',name:'P90 | Neoqueen',              rarity:'res',rarityName:'Restricted',weight:20, value:210},
+    {emoji:'🔫',name:'FAMAS | Rapid Eye Movement',  rarity:'ind',rarityName:'Industrial',weight:36, value:120},
+    {emoji:'🔫',name:'XM1014 | Zombie Offensive',   rarity:'mil',rarityName:'Mil-Spec',  weight:40, value:70},
+    {emoji:'🔫',name:'AUG | Midnight Lily',         rarity:'mil',rarityName:'Mil-Spec',  weight:40, value:65},
+    {emoji:'🔫',name:'PP-Bizon | Space Cat',        rarity:'mil',rarityName:'Mil-Spec',  weight:40, value:60},
+  ]},
+  { id:'recoil', emoji:'🟠', name:'Recoil Case', price:120, items:[
+    {emoji:'🔫',name:'Glock-18 | Umbral Rabbit',    rarity:'cov',rarityName:'Covert',    weight:1,  value:6500},
+    {emoji:'🔪',name:'Stiletto Knife | Tiger Tooth', rarity:'sec',rarityName:'Secret',   weight:2,  value:3200},
+    {emoji:'🔫',name:'AK-47 | Ice Coaled',          rarity:'cla',rarityName:'Classified',weight:8,  value:1000},
+    {emoji:'🔫',name:'M4A1-S | Restless',           rarity:'cla',rarityName:'Classified',weight:8,  value:750},
+    {emoji:'🔫',name:'Desert Eagle | Blue Ply',     rarity:'res',rarityName:'Restricted',weight:20, value:300},
+    {emoji:'🔫',name:'MAC-10 | Ensnared',           rarity:'res',rarityName:'Restricted',weight:20, value:220},
+    {emoji:'🔫',name:'Sawed-Off | Spirit Board',    rarity:'ind',rarityName:'Industrial',weight:36, value:125},
+    {emoji:'🔫',name:'MP5-SD | Liquidation',        rarity:'mil',rarityName:'Mil-Spec',  weight:40, value:72},
+    {emoji:'🔫',name:'P250 | Re.built',             rarity:'mil',rarityName:'Mil-Spec',  weight:40, value:66},
+    {emoji:'🔫',name:'XM1014 | Entombed',           rarity:'mil',rarityName:'Mil-Spec',  weight:40, value:62},
+  ]},
+  { id:'prisma', emoji:'💎', name:'Prisma Case', price:200, items:[
+    {emoji:'🔫',name:'AK-47 | Phantom Disruptor',   rarity:'cov',rarityName:'Covert',    weight:1,  value:12000},
+    {emoji:'🔪',name:'Skeleton Knife | Crimson Web', rarity:'sec',rarityName:'Secret',   weight:2,  value:5500},
+    {emoji:'🔫',name:'M4A4 | The Emperor',          rarity:'cla',rarityName:'Classified',weight:8,  value:1700},
+    {emoji:'🔫',name:'AWP | Atheris',               rarity:'cla',rarityName:'Classified',weight:8,  value:1200},
+    {emoji:'🔫',name:'Glock-18 | Twilight Galaxy',  rarity:'res',rarityName:'Restricted',weight:20, value:480},
+    {emoji:'🔫',name:'AUG | Momentum',              rarity:'res',rarityName:'Restricted',weight:20, value:360},
+    {emoji:'🔫',name:'MP9 | Hydra',                 rarity:'ind',rarityName:'Industrial',weight:36, value:200},
+    {emoji:'🔫',name:'Tec-9 | Bamboozle',           rarity:'mil',rarityName:'Mil-Spec',  weight:40, value:110},
+    {emoji:'🔫',name:'FAMAS | Crypsis',             rarity:'mil',rarityName:'Mil-Spec',  weight:40, value:100},
+    {emoji:'🔫',name:'UMP-45 | Primal Saber',       rarity:'mil',rarityName:'Mil-Spec',  weight:40, value:100},
   ]},
 ];
 
@@ -683,9 +1075,11 @@ function openCase(){
   setTimeout(()=>{
     track.style.transition='transform 4s cubic-bezier(0.12,0.8,0.2,1)';
     track.style.transform=`translateX(${targetX}px)`;
+    startCaseTicks(0);
   },50);
 
   setTimeout(()=>{
+    stopCaseTicks();
     caseSpinning=false;
     document.getElementById('btn-case-open').disabled=false;
     const profit=wonItem.value-cas.price;
@@ -695,6 +1089,7 @@ function openCase(){
     display.className=`case-won-display visible rarity-${wonItem.rarity}`;
     document.getElementById('won-emoji').textContent=wonItem.emoji;
     document.getElementById('won-info').innerHTML=`<div class="won-rarity-badge">${wonItem.rarityName}</div><div class="won-name">${wonItem.name}</div><div class="won-value">${t('value_label')} ${fmt(wonItem.value)} PLN</div>`;
+    sndCaseReveal(wonItem.rarity);
 
     const res=document.getElementById('case-result');
     if(profit>=0){res.className='result-msg win';res.textContent=`${t('profit')} +${fmt(profit)} PLN`;addHistory('Case',true,profit);}
@@ -792,6 +1187,7 @@ function spinRoulette(){
   document.getElementById('btn-rl-spin').disabled=true;
   document.getElementById('rl-result').className='result-msg';
   document.getElementById('rl-result-num').style.display='none';
+  startRouletteBall();
 
   // Pick random result
   const resultIdx = Math.floor(Math.random()*RL_NUMS.length);
@@ -819,6 +1215,7 @@ function spinRoulette(){
     if(progress<1){ requestAnimationFrame(animate); return; }
 
     // Done
+    stopRouletteBall();
     rlSpinning=false;
     document.getElementById('btn-rl-spin').disabled=false;
 
@@ -845,10 +1242,12 @@ function spinRoulette(){
       res.className='result-msg win';
       res.textContent=`${t('won_rl')} +${fmt(payout-bet)} PLN (×${mult})`;
       addHistory('Ruletka',true,payout-bet);
+      sndRouletteWin(resultCol==='green');
     } else {
       res.className='result-msg lose';
       res.textContent=`${t('lost_rl')} -${fmt(bet)} PLN`;
       addHistory('Ruletka',false,bet);
+      sndRouletteLose();
     }
   }
   requestAnimationFrame(animate);
@@ -878,6 +1277,9 @@ function toggleLang(){
   currentLang = currentLang==='pl'?'en':'pl';
   applyLang();
 }
+
+// Apply language on page load
+applyLang();
 </script>
 </body>
 </html>
