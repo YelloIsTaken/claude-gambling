@@ -6,6 +6,9 @@
 <title>NeonBet — Casino Online</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 
+<!-- Load Firebase config from external file (not committed to git) -->
+<script src="config.js"></script>
+
 <!-- Firebase SDKs -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -14,25 +17,15 @@
   import { getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  // ── PASTE YOUR FIREBASE CONFIG HERE ──────────────────────────────────────
-  // Go to https://console.firebase.google.com → your project →
-  // Project settings → Your apps → Web app → firebaseConfig
-  const firebaseConfig = {
-    apiKey:            "AIzaSyABZ_VX9pmz80_OMuA-8f8eWw9n7X08l_Q",
-    authDomain:        "neonbet-8388b.firebaseapp.com",
-    projectId:         "neonbet-8388b",
-    storageBucket:     "neonbet-8388b.firebasestorage.app",
-    messagingSenderId: "137314023473",
-    appId:             "1:137314023473:web:b2ce2909b2ceca09d9bd10"
-  };
-  // ─────────────────────────────────────────────────────────────────────────
+  if (!window.FIREBASE_CONFIG || window.FIREBASE_CONFIG.apiKey === "PASTE_API_KEY") {
+    console.error("⚠️  Firebase not configured. Open config.js and fill in your credentials.");
+  }
 
-  const app  = initializeApp(firebaseConfig);
+  const app  = initializeApp(window.FIREBASE_CONFIG);
   const auth = getAuth(app);
   const db   = getFirestore(app);
   const provider = new GoogleAuthProvider();
 
-  // Expose to global scope so non-module code can call them
   window._fb = { auth, db, provider, signInWithPopup, signOut,
                  onAuthStateChanged, doc, getDoc, setDoc, updateDoc, serverTimestamp };
 </script>
@@ -203,6 +196,40 @@
   .odds-chip.cla { background:rgba(220,50,50,.12);  color:#cc3355; border:1px solid #cc335533; }
   .odds-chip.sec { background:rgba(255,165,0,.12);  color:#ff9900; border:1px solid #ff990033; }
   .odds-chip.cov { background:rgba(255,215,0,.12);  color:#ffd700; border:1px solid #ffd70033; }
+
+  /* Multi-open quantity selector */
+  .open-qty-row { display:flex; align-items:center; gap:6px; margin-bottom:12px; }
+  .open-qty-btn { flex:1; padding:8px 4px; border:2px solid var(--border); border-radius:7px; background:var(--surface); color:var(--muted); font-family:'Bebas Neue',sans-serif; font-size:1rem; letter-spacing:2px; cursor:pointer; text-align:center; transition:all .18s; touch-action:manipulation; }
+  .open-qty-btn:hover { border-color:var(--purple); color:var(--purple); }
+  .open-qty-btn.active { border-color:var(--purple); background:rgba(180,79,255,.12); color:#fff; box-shadow:0 0 12px rgba(180,79,255,.3); }
+
+  /* Multi-open results grid */
+  .multi-results { display:none; flex-direction:column; gap:10px; margin-bottom:12px; }
+  .multi-results.visible { display:flex; }
+  .multi-spinners { display:flex; flex-direction:column; gap:8px; }
+  .multi-spinner-row { position:relative; overflow:hidden; border:1px solid var(--border); border-radius:8px; background:var(--surface); height:80px; }
+  .multi-spinner-row::before { content:''; position:absolute; top:0; bottom:0; left:50%; transform:translateX(-50%); width:2px; background:var(--purple); box-shadow:0 0 8px rgba(180,79,255,.8); z-index:10; pointer-events:none; }
+  .multi-spinner-row::after  { content:''; position:absolute; inset:0; background:linear-gradient(90deg,var(--surface) 0%,transparent 12%,transparent 88%,var(--surface) 100%); z-index:9; pointer-events:none; }
+  .multi-track { display:flex; align-items:center; height:100%; padding:0 6px; gap:4px; will-change:transform; }
+  .multi-spin-item { flex-shrink:0; width:68px; height:68px; border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; border:2px solid transparent; font-size:.48rem; text-align:center; font-weight:700; }
+  .multi-spin-item .item-emoji { font-size:1.4rem; line-height:1; }
+  .multi-spin-item .item-name  { color:rgba(255,255,255,.8); line-height:1.2; padding:0 2px; }
+  .multi-spin-item.rarity-mil { background:rgba(90,90,255,.12);  border-color:#6688ff; }
+  .multi-spin-item.rarity-ind { background:rgba(90,180,255,.1);  border-color:#4fa3e0; }
+  .multi-spin-item.rarity-res { background:rgba(130,80,230,.12); border-color:#8855dd; }
+  .multi-spin-item.rarity-cla { background:rgba(220,50,50,.12);  border-color:#cc3355; }
+  .multi-spin-item.rarity-sec { background:rgba(255,165,0,.12);  border-color:#ff9900; }
+  .multi-spin-item.rarity-cov { background:rgba(255,215,0,.12);  border-color:#ffd700; }
+
+  /* Multi-open summary */
+  .multi-summary { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:12px 14px; }
+  .multi-summary-title { font-size:.6rem; color:var(--muted); text-transform:uppercase; letter-spacing:2px; margin-bottom:8px; }
+  .multi-items-list { display:flex; flex-direction:column; gap:5px; }
+  .multi-item-row { display:flex; align-items:center; gap:10px; padding:5px 0; border-bottom:1px solid var(--border); }
+  .multi-item-row:last-child { border-bottom:none; }
+  .multi-item-emoji { font-size:1.2rem; flex-shrink:0; }
+  .multi-item-name { flex:1; font-size:.7rem; color:var(--text); }
+  .multi-item-value { font-size:.75rem; font-weight:700; color:var(--gold); }
 
   /* ===== ROULETTE ===== */
   .game-card.roulette::before { background:linear-gradient(90deg,transparent,#00e5ff,transparent); }
@@ -386,17 +413,43 @@
           </div>
           <div>
             <div class="odds-table" id="odds-table"></div>
-            <div class="spinner-wrapper">
-              <div class="spinner-marker-top"></div>
-              <div class="spinner-marker-bot"></div>
-              <div class="spinner-track" id="spinner-track"></div>
+
+            <!-- Quantity selector -->
+            <div class="open-qty-row" id="qty-row">
+              <button class="open-qty-btn active" data-qty="1" onclick="setOpenQty(1)">×1</button>
+              <button class="open-qty-btn" data-qty="2" onclick="setOpenQty(2)">×2</button>
+              <button class="open-qty-btn" data-qty="3" onclick="setOpenQty(3)">×3</button>
+              <button class="open-qty-btn" data-qty="5" onclick="setOpenQty(5)">×5</button>
+              <button class="open-qty-btn" data-qty="10" onclick="setOpenQty(10)">×10</button>
             </div>
-            <div class="case-won-display" id="case-won-display">
-              <div class="won-emoji" id="won-emoji"></div>
-              <div class="won-info" id="won-info"></div>
+
+            <!-- Single spinner (qty=1) -->
+            <div id="single-spinner-area">
+              <div class="spinner-wrapper">
+                <div class="spinner-marker-top"></div>
+                <div class="spinner-marker-bot"></div>
+                <div class="spinner-track" id="spinner-track"></div>
+              </div>
+              <div class="case-won-display" id="case-won-display">
+                <div class="won-emoji" id="won-emoji"></div>
+                <div class="won-info" id="won-info"></div>
+              </div>
             </div>
+
+            <!-- Multi spinners (qty>1) -->
+            <div class="multi-results" id="multi-results">
+              <div class="multi-spinners" id="multi-spinners"></div>
+              <div class="multi-summary" id="multi-summary" style="display:none">
+                <div class="multi-summary-title" data-i18n="items_won">Items Won</div>
+                <div class="multi-items-list" id="multi-items-list"></div>
+                <div style="margin-top:8px;font-size:.75rem;color:var(--muted)">
+                  Total: <span id="multi-total" style="color:var(--gold);font-weight:700"></span>
+                </div>
+              </div>
+            </div>
+
             <div id="case-result" class="result-msg"></div>
-            <button class="btn-play purple" id="btn-case-open" onclick="openCase()">OTWÓRZ SKRZYNKĘ</button>
+            <button class="btn-play purple" id="btn-case-open" onclick="openCase()">OPEN (50 PLN)</button>
           </div>
         </div>
       </div>
@@ -764,6 +817,7 @@ const T = {
     won_rl:'🎉 Wygrałeś!', lost_rl:'😢 Przegrana!',
     rl_colors:{red:'🔴 Czerwone', black:'⚫ Czarne', green:'🟢 Zero'},
     hist_games:{Mines:'Mines', Coinflip:'Coinflip', Case:'Case', Ruletka:'Ruletka'},
+    items_won:'Wygrane przedmioty',
   },
   en: {
     balance:'Balance', choose_game:'Choose a game', bet:'Bet',
@@ -784,6 +838,7 @@ const T = {
     won_rl:'🎉 You won!', lost_rl:'😢 You lost!',
     rl_colors:{red:'🔴 Red', black:'⚫ Black', green:'🟢 Zero'},
     hist_games:{Mines:'Mines', Coinflip:'Coinflip', Case:'Case', Ruletka:'Roulette'},
+    items_won:'Items Won',
   }
 };
 
@@ -998,7 +1053,30 @@ const CASES=[
 ];
 
 let selectedCaseId=CASES[0].id, caseSpinning=false;
+let openQty = 1;
 function getCase(){ return CASES.find(c=>c.id===selectedCaseId); }
+
+function setOpenQty(qty){
+  openQty = qty;
+  document.querySelectorAll('.open-qty-btn').forEach(b=>{
+    b.classList.toggle('active', parseInt(b.dataset.qty)===qty);
+  });
+  // Show/hide correct spinner area
+  document.getElementById('single-spinner-area').style.display = qty===1 ? 'block' : 'none';
+  document.getElementById('multi-results').className = qty>1 ? 'multi-results visible' : 'multi-results';
+  if(qty===1){ buildInitialSpinner(); }
+  else { buildMultiSpinners(qty); }
+  document.getElementById('case-won-display').className='case-won-display';
+  document.getElementById('case-result').className='result-msg';
+  document.getElementById('multi-summary').style.display='none';
+  updateOpenBtn();
+}
+
+function updateOpenBtn(){
+  const cas=getCase();
+  const total=cas.price*openQty;
+  document.getElementById('btn-case-open').textContent=`${t('open_btn')} ${openQty}× (${fmt(total)} PLN)`;
+}
 
 function buildCaseUI(){
   const list=document.getElementById('case-list');list.innerHTML='';
@@ -1009,10 +1087,13 @@ function buildCaseUI(){
     el.onclick=()=>{ selectedCaseId=c.id; buildCaseUI(); };
     list.appendChild(el);
   });
-  buildOdds(); buildInitialSpinner();
-  document.getElementById('btn-case-open').textContent=`${t('open_btn')} (${getCase().price} PLN)`;
+  buildOdds();
+  if(openQty===1) buildInitialSpinner();
+  else buildMultiSpinners(openQty);
   document.getElementById('case-result').className='result-msg';
   document.getElementById('case-won-display').className='case-won-display';
+  document.getElementById('multi-summary').style.display='none';
+  updateOpenBtn();
 }
 
 function buildOdds(){
@@ -1029,46 +1110,54 @@ function weightedRandom(items){
   return items[items.length-1];
 }
 
-function makeSpinItem(item){
+function makeSpinItem(item, multi=false){
   const el=document.createElement('div');
-  el.className=`spin-item rarity-${item.rarity}`;
+  el.className=`${multi?'multi-spin-item':'spin-item'} rarity-${item.rarity}`;
   el.innerHTML=`<div class="item-emoji">${item.emoji}</div><div class="item-name">${item.name}</div>`;
   return el;
 }
 
 function buildInitialSpinner(){
   const track=document.getElementById('spinner-track');
+  if(!track)return;
   const cas=getCase();track.innerHTML='';track.style.transform='translateX(0)';track.style.transition='none';
   for(let i=0;i<18;i++){const item=cas.items[Math.floor(Math.random()*cas.items.length)];track.appendChild(makeSpinItem(item));}
 }
 
-function openCase(){
-  if(caseSpinning)return;
+function buildMultiSpinners(qty){
+  const container=document.getElementById('multi-spinners');
+  container.innerHTML='';
   const cas=getCase();
-  if(cas.price>balance){alert('Za mało środków!');return;}
-  updateBalance(-cas.price);
-  caseSpinning=true;
-  document.getElementById('btn-case-open').disabled=true;
-  document.getElementById('case-result').className='result-msg';
-  document.getElementById('case-won-display').className='case-won-display';
+  for(let q=0;q<qty;q++){
+    const row=document.createElement('div');
+    row.className='multi-spinner-row';
+    row.id=`multi-track-wrap-${q}`;
+    const track=document.createElement('div');
+    track.className='multi-track';
+    track.id=`multi-track-${q}`;
+    for(let i=0;i<14;i++){
+      const item=cas.items[Math.floor(Math.random()*cas.items.length)];
+      track.appendChild(makeSpinItem(item,true));
+    }
+    row.appendChild(track);
+    container.appendChild(row);
+  }
+}
 
+/* ——— SINGLE OPEN ——— */
+function openSingle(cas){
+  document.getElementById('case-won-display').className='case-won-display';
   const wonItem=weightedRandom(cas.items);
   const WINNER_POS=52;
   const track=document.getElementById('spinner-track');
   track.style.transition='none';track.style.transform='translateX(0)';track.innerHTML='';
-
   for(let i=0;i<60;i++){
     track.appendChild(makeSpinItem(i===WINNER_POS ? wonItem : cas.items[Math.floor(Math.random()*cas.items.length)]));
   }
-
-  // Measure actual rendered item width (works on all screen sizes)
   track.getBoundingClientRect();
-  const firstItem = track.firstElementChild;
-  const ITEM_W = firstItem.offsetWidth + 5; // width + gap
-
+  const ITEM_W=track.firstElementChild.offsetWidth+5;
   const wrapperW=document.querySelector('.spinner-wrapper').offsetWidth;
   const centerOffset=wrapperW/2-ITEM_W/2;
-  // Small random offset so item doesn't always land perfectly centered
   const jitter=(Math.random()-0.5)*ITEM_W*0.6;
   const targetX=-(WINNER_POS*ITEM_W-centerOffset+jitter);
 
@@ -1084,20 +1173,104 @@ function openCase(){
     document.getElementById('btn-case-open').disabled=false;
     const profit=wonItem.value-cas.price;
     updateBalance(wonItem.value);
-
     const display=document.getElementById('case-won-display');
     display.className=`case-won-display visible rarity-${wonItem.rarity}`;
     document.getElementById('won-emoji').textContent=wonItem.emoji;
     document.getElementById('won-info').innerHTML=`<div class="won-rarity-badge">${wonItem.rarityName}</div><div class="won-name">${wonItem.name}</div><div class="won-value">${t('value_label')} ${fmt(wonItem.value)} PLN</div>`;
     sndCaseReveal(wonItem.rarity);
-
     const res=document.getElementById('case-result');
     if(profit>=0){res.className='result-msg win';res.textContent=`${t('profit')} +${fmt(profit)} PLN`;addHistory('Case',true,profit);}
     else{res.className='result-msg lose';res.textContent=`${t('loss')} ${fmt(Math.abs(profit))} PLN`;addHistory('Case',false,Math.abs(profit));}
   },4300);
 }
 
+/* ——— MULTI OPEN ——— */
+function openMulti(cas, qty){
+  const wonItems=[];
+  for(let q=0;q<qty;q++) wonItems.push(weightedRandom(cas.items));
+
+  const WINNER_POS=28;
+  const ITEM_W=72; // 68px + 4px gap
+  let finished=0;
+
+  wonItems.forEach((wonItem,q)=>{
+    const track=document.getElementById(`multi-track-${q}`);
+    if(!track)return;
+    track.style.transition='none';track.style.transform='translateX(0)';track.innerHTML='';
+    for(let i=0;i<40;i++){
+      track.appendChild(makeSpinItem(i===WINNER_POS ? wonItem : cas.items[Math.floor(Math.random()*cas.items.length)],true));
+    }
+    track.getBoundingClientRect();
+
+    const wrapperW=track.parentElement.offsetWidth;
+    const centerOffset=wrapperW/2-ITEM_W/2;
+    const jitter=(Math.random()-0.5)*ITEM_W*0.5;
+    const targetX=-(WINNER_POS*ITEM_W-centerOffset+jitter);
+    // Stagger start slightly
+    const spinDur=3200+q*120;
+
+    setTimeout(()=>{
+      track.style.transition=`transform ${spinDur/1000}s cubic-bezier(0.12,0.8,0.2,1)`;
+      track.style.transform=`translateX(${targetX}px)`;
+      if(q===0) startCaseTicks(0);
+    },50+q*60);
+
+    setTimeout(()=>{
+      finished++;
+      if(finished===qty){
+        stopCaseTicks();
+        caseSpinning=false;
+        document.getElementById('btn-case-open').disabled=false;
+
+        // Sum total value
+        const totalVal=wonItems.reduce((s,it)=>s+it.value,0);
+        const totalCost=cas.price*qty;
+        const profit=totalVal-totalCost;
+        updateBalance(totalVal);
+
+        // Show summary
+        const summary=document.getElementById('multi-summary');
+        summary.style.display='block';
+        const itemsList=document.getElementById('multi-items-list');
+        itemsList.innerHTML=wonItems.map(it=>`
+          <div class="multi-item-row">
+            <div class="multi-item-emoji">${it.emoji}</div>
+            <div class="multi-item-name">${it.name} <span style="font-size:.55rem;color:var(--muted)">(${it.rarityName})</span></div>
+            <div class="multi-item-value">${fmt(it.value)} PLN</div>
+          </div>`).join('');
+        document.getElementById('multi-total').textContent=`${fmt(totalVal)} PLN`;
+
+        // Play reveal for rarest item
+        const rarityOrder=['mil','ind','res','cla','sec','cov'];
+        const rarest=wonItems.reduce((best,it)=>rarityOrder.indexOf(it.rarity)>rarityOrder.indexOf(best.rarity)?it:best);
+        sndCaseReveal(rarest.rarity);
+
+        const res=document.getElementById('case-result');
+        if(profit>=0){res.className='result-msg win';res.textContent=`${t('profit')} +${fmt(profit)} PLN`;addHistory('Case',true,profit);}
+        else{res.className='result-msg lose';res.textContent=`${t('loss')} ${fmt(Math.abs(profit))} PLN`;addHistory('Case',false,Math.abs(profit));}
+      }
+    }, spinDur+200+q*120);
+  });
+}
+
+function openCase(){
+  if(caseSpinning)return;
+  const cas=getCase();
+  const totalCost=cas.price*openQty;
+  if(totalCost>balance){alert(t('invalid_bet'));return;}
+  updateBalance(-totalCost);
+  caseSpinning=true;
+  document.getElementById('btn-case-open').disabled=true;
+  document.getElementById('case-result').className='result-msg';
+  document.getElementById('case-won-display').className='case-won-display';
+  document.getElementById('multi-summary').style.display='none';
+
+  if(openQty===1){ openSingle(cas); }
+  else { openMulti(cas, openQty); }
+}
+
 buildCaseUI();
+
 
 /* ——— ROULETTE ——— */
 // 37 pól: 0 (zielone), 1-36 (czerwone parzyste: 2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36)
